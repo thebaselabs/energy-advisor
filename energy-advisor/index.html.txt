@@ -831,9 +831,7 @@
         (function(){
             'use strict';
             
-            // 🔑 GEMINI AI Configuration - ADD YOUR API KEY HERE
-            const GEMINI_API_KEY = ''; // ADD YOUR GEMINI API KEY HERE
-            
+            // 🔥 NO API KEY HERE - IT'S SAFE ON VERCEL SERVER
             let currentCaloriesBurned = 0;
             let currentReplenishmentCalories = 0;
             let currentActivityCategory = null;
@@ -862,13 +860,6 @@
                 customActivity: document.getElementById('custom-activity'),
                 analyzeBtn: document.getElementById('analyze-btn'),
                 btnText: document.querySelector('.btn-text'),
-                
-                // Personalization inputs
-                personalizationPanel: document.getElementById('personalization-panel'),
-                dietaryPreference: document.getElementById('dietary-preference'),
-                eatingTiming: document.getElementById('eating-timing'),
-                foodGoal: document.getElementById('food-goal'),
-                personalizeBtn: document.getElementById('personalize-btn'),
                 
                 // Results
                 aiAnalysis: document.getElementById('ai-analysis'),
@@ -900,7 +891,6 @@
             function setupEventListeners() {
                 elements.analyzeBtn.addEventListener('click', analyzeActivityWithAI);
                 elements.getRecommendationsBtn.addEventListener('click', showPersonalizationPanel);
-                elements.personalizeBtn.addEventListener('click', applyPersonalizationAndShowFoods);
                 elements.clearActivitiesBtn.addEventListener('click', clearAll);
                 elements.foodCategories.addEventListener('click', handleCategoryFilter);
             }
@@ -974,17 +964,17 @@
                 try {
                     const activityDescription = elements.customActivity.value.trim();
                     
-                    // Call Gemini AI for analysis
+                    // Call Vercel backend instead of direct API
                     const aiResponse = await callGeminiAI(activityDescription, userProfile);
                     
-                    // 🛡️ CRITICAL: Validate AI response before using it
+                    // Validate AI response before using it
                     const validatedResponse = validateAIResponse(aiResponse, userProfile, activityDescription);
                     
                     if (validatedResponse && validatedResponse.calories) {
                         currentCaloriesBurned = validatedResponse.calories;
                         currentActivityCategory = validatedResponse.activityType;
                         
-                        // 🎯 EXTRACT AI FOOD CATEGORIES
+                        // Extract AI food categories
                         aiFoodCategories = parseAIFoodCategories(validatedResponse);
                         console.log('AI Food Categories:', aiFoodCategories);
                         
@@ -1004,6 +994,48 @@
                 }
             }
 
+            async function callGeminiAI(activityDescription, userProfile) {
+                // ✅ Using your Vercel backend instead of direct API
+                const VERCEL_BACKEND_URL = '/api/analyze';
+
+                try {
+                    console.log('🚀 Calling Vercel backend...');
+                    
+                    const response = await fetch(VERCEL_BACKEND_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            activity: activityDescription,
+                            profile: userProfile
+                        })
+                    });
+
+                    console.log('📡 Backend response status:', response.status);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Backend request failed: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    console.log('✅ Backend response received');
+                    
+                    // Extract JSON from AI response text
+                    const responseText = data.candidates[0].content.parts[0].text;
+                    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+                    
+                    if (jsonMatch) {
+                        return JSON.parse(jsonMatch[0]);
+                    } else {
+                        throw new Error('No JSON found in AI response');
+                    }
+                } catch (error) {
+                    console.error('❌ Backend Error:', error);
+                    throw error;
+                }
+            }
+
             function parseAIFoodCategories(aiResponse) {
                 const defaultCategories = {
                     quick_energy: [],
@@ -1012,7 +1044,6 @@
                     full_meals: []
                 };
 
-                // 🛡️ BULLETPROOF PARSING - Handle any AI response format
                 if (aiResponse.food_categories) {
                     return {
                         quick_energy: aiResponse.food_categories.quick_energy || [],
@@ -1022,9 +1053,7 @@
                     };
                 }
                 
-                // 🛡️ FALLBACK: If AI used old format
                 if (aiResponse.food_recommendations && Array.isArray(aiResponse.food_recommendations)) {
-                    // Distribute foods intelligently into categories
                     return distributeFoodsToCategories(aiResponse.food_recommendations);
                 }
                 
@@ -1061,31 +1090,25 @@
             }
 
             function validateAIResponse(aiResponse, userProfile, activityDescription) {
-                // 🚨 SANITY CHECK 1: Calories exist and are reasonable
                 if (!aiResponse.calories || aiResponse.calories <= 0) {
                     throw new Error('AI returned invalid calorie data');
                 }
                 
-                // 🚨 SANITY CHECK 2: Estimate activity duration for calorie/hour check
                 const estimatedMinutes = estimateActivityMinutes(activityDescription);
                 const caloriesPerHour = (aiResponse.calories / estimatedMinutes) * 60;
                 
-                // Human limits: nobody burns over 1200 calories/hour in normal exercise
                 if (caloriesPerHour > 1200) {
                     console.warn('AI returned unrealistic calories per hour:', caloriesPerHour);
                     throw new Error('AI returned unrealistic calorie estimate for this activity');
                 }
                 
-                // 🚨 SANITY CHECK 3: Minimum calories for any activity
                 if (aiResponse.calories < 10) {
                     throw new Error('AI returned unrealistically low calories');
                 }
                 
-                // 🚨 SANITY CHECK 4: Macronutrients add up to ~100%
                 if (aiResponse.macronutrients) {
                     const total = aiResponse.macronutrients.carbs + aiResponse.macronutrients.protein + aiResponse.macronutrients.fat;
                     if (total < 80 || total > 120) {
-                        // Reset to sensible defaults
                         aiResponse.macronutrients = {carbs: 55, protein: 25, fat: 20};
                     }
                 }
@@ -1100,152 +1123,7 @@
                     const unit = timeMatch[2].toLowerCase();
                     return unit.includes('hour') ? num * 60 : num;
                 }
-                return 30; // Default 30 minutes if no time specified
-            }
-
-            async function callGeminiAI(activityDescription, userProfile) {
-                // Check if API key is configured
-                if (!GEMINI_API_KEY || GEMINI_API_KEY === '') {
-                    throw new Error('Please configure your Gemini API key. Get a FREE key from: https://aistudio.google.com/');
-                }
-
-                // ✅ CORRECTED ENDPOINT - Using gemini-2.0-flash instead of deprecated 1.0-pro
-                const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-                const prompt = `
-CRITICAL: Use EXACT calculations based on user profile. DO NOT estimate generally.
-
-USER PROFILE (MUST USE THESE EXACT NUMBERS):
-- Weight: ${userProfile.weight} kg - DIRECTLY AFFECTS CALORIE BURN
-- Age: ${userProfile.age} years - AFFECTS METABOLISM  
-- Gender: ${userProfile.gender} - AFFECTS CALORIE CALCULATIONS
-- Fitness Level: ${userProfile.fitnessLevel} - AFFECTS INTENSITY & RECOVERY
-
-ACTIVITY: "${activityDescription}"
-
-CALORIE CALCULATION RULES:
-- Base metabolic rate adjustment for age/gender
-- Weight-based calorie burn: heavier people burn more
-- Fitness level intensity adjustment
-- MAXIMUM calories per hour: 1000 for extreme exercise
-
-CALORIE RANGE SANITY CHECK:
-- Light activity: 150-300 calories/hour
-- Moderate: 300-500 calories/hour  
-- Intense: 500-800 calories/hour
-- Extreme: 800-1000 calories/hour
-
-CRITICAL: You MUST return foods in EXACT 4 categories:
-
-1. ⚡ QUICK ENERGY: Fast-digesting carbs, immediate consumption (1-hour)
-2. 💪 PROTEIN RICH: High-protein foods, muscle repair focus (1-2 hours)  
-3. ⚖️ BALANCED: Good carb-protein-fat ratio, within 2 hours
-4. 🍽️ FULL MEALS: Complete meals, next proper meal (2+ hours)
-
-FOOD FORMAT PER CATEGORY:
-- 3-5 foods per category
-- Each food: name, calories, timing, rationale, emoji
-- NO MISSING CATEGORIES
-
-EXACT JSON RESPONSE REQUIRED:
-{
-    "calories": calculated_number_using_above_rules,
-    "activityType": "light|moderate|intense|extreme",
-    "analysis": "Detailed analysis using user profile data",
-    "macronutrients": {"carbs": 50-70, "protein": 15-30, "fat": 15-25},
-    "food_categories": {
-        "quick_energy": [
-            {
-                "name": "Banana",
-                "calories": 105,
-                "timing": "immediate",
-                "rationale": "Fast-digesting carbs replenish muscle glycogen quickly",
-                "emoji": "🍌"
-            }
-        ],
-        "protein_rich": [
-            {
-                "name": "Greek Yogurt with Berries",
-                "calories": 150,
-                "timing": "1-hour",
-                "rationale": "High-quality protein for muscle repair with antioxidants",
-                "emoji": "🥛🫐"
-            }
-        ],
-        "balanced": [
-            {
-                "name": "Turkey Sandwich",
-                "calories": 320,
-                "timing": "2-hours",
-                "rationale": "Balanced macros for sustained energy and recovery",
-                "emoji": "🥪"
-            }
-        ],
-        "full_meals": [
-            {
-                "name": "Salmon with Sweet Potato & Vegetables",
-                "calories": 450,
-                "timing": "next-meal",
-                "rationale": "Complete meal with omega-3s and complex carbs for full recovery",
-                "emoji": "🐟🍠"
-            }
-        ]
-    }
-}
-
-Be realistic and practical in your recommendations.
-`;
-
-                try {
-                    console.log('🚀 Making API call to Gemini...');
-                    
-                    const response = await fetch(GEMINI_URL, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            contents: [{
-                                parts: [{
-                                    text: prompt
-                                }]
-                            }],
-                            generationConfig: {
-                                temperature: 0.1,
-                                maxOutputTokens: 2000,
-                            }
-                        })
-                    });
-
-                    console.log('📡 Response status:', response.status);
-                    
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        console.error('❌ API Error:', errorText);
-                        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-                    }
-
-                    const data = await response.json();
-                    console.log('✅ AI Response received');
-                    
-                    if (!data.candidates || !data.candidates[0].content.parts[0].text) {
-                        throw new Error('Invalid response format from AI');
-                    }
-                    
-                    const responseText = data.candidates[0].content.parts[0].text;
-                    console.log('📝 Raw AI Response:', responseText);
-                    
-                    // Extract JSON from response
-                    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-                    if (jsonMatch) {
-                        return JSON.parse(jsonMatch[0]);
-                    } else {
-                        throw new Error('No JSON found in AI response');
-                    }
-                } catch (error) {
-                    console.error('❌ Gemini API Error:', error);
-                    throw error;
-                }
+                return 30;
             }
 
             function displayAIResults(aiResponse) {
@@ -1253,10 +1131,8 @@ Be realistic and practical in your recommendations.
                 elements.caloriesResult.style.display = 'block';
                 elements.aiAnalysis.classList.add('active');
                 
-                // Display AI analysis
                 elements.aiRecommendation.textContent = aiResponse.analysis;
                 
-                // Display macronutrient breakdown
                 const macros = aiResponse.macronutrients || {carbs: 50, protein: 30, fat: 20};
                 elements.macroBreakdown.innerHTML = `
                     <div class="macro-item">
@@ -1282,17 +1158,6 @@ Be realistic and practical in your recommendations.
                     return;
                 }
                 
-                elements.personalizationPanel.style.display = 'block';
-                elements.personalizationPanel.scrollIntoView({behavior: 'smooth', block: 'start'});
-            }
-
-            function applyPersonalizationAndShowFoods() {
-                // Get user preferences
-                userPreferences.dietary = elements.dietaryPreference.value;
-                userPreferences.timing = elements.eatingTiming.value;
-                userPreferences.goal = elements.foodGoal.value;
-                
-                // Calculate replenishment calories
                 const goal = elements.weightGoal.value;
                 const replenishPercent = parseInt(elements.replenishPercent.value);
                 
@@ -1310,9 +1175,7 @@ Be realistic and practical in your recommendations.
                 elements.foodHeader.textContent = currentReplenishmentCalories;
                 elements.foodRecommendations.style.display = 'block';
                 
-                // Show the first category by default
                 renderFoodCategory('quick-energy');
-                
                 elements.foodRecommendations.scrollIntoView({behavior: 'smooth', block: 'start'});
             }
 
@@ -1347,9 +1210,6 @@ Be realistic and practical in your recommendations.
                 const title = document.createElement('div');
                 title.className = 'food-category-title';
                 title.innerHTML = config.title;
-                if (userPreferences.dietary !== 'any' || userPreferences.timing !== 'immediate' || userPreferences.goal !== 'recovery') {
-                    title.innerHTML += ' <span class="personalization-badge">PERSONALIZED</span>';
-                }
                 categoryDiv.appendChild(title);
                 
                 if (config.data && config.data.length > 0) {
@@ -1402,7 +1262,6 @@ Be realistic and practical in your recommendations.
             }
 
             function clearAll() {
-                // Clear all inputs and reset state
                 elements.userWeight.value = '';
                 elements.userAge.value = '';
                 elements.userGender.value = '';
@@ -1410,27 +1269,15 @@ Be realistic and practical in your recommendations.
                 elements.customActivity.value = '';
                 elements.weightGoal.value = 'maintenance';
                 elements.replenishPercent.value = '75';
-                elements.dietaryPreference.value = 'any';
-                elements.eatingTiming.value = 'immediate';
-                elements.foodGoal.value = 'recovery';
                 
-                // Hide panels
-                elements.personalizationPanel.style.display = 'none';
                 elements.aiAnalysis.classList.remove('active');
                 elements.caloriesResult.style.display = 'none';
                 elements.foodRecommendations.style.display = 'none';
                 
-                // Reset data
                 currentCaloriesBurned = 0;
                 currentReplenishmentCalories = 0;
                 currentActivityCategory = null;
                 userProfile = {};
-                userPreferences = {
-                    dietary: 'any',
-                    timing: 'immediate',
-                    goal: 'recovery',
-                    allergies: []
-                };
                 aiFoodCategories = {
                     quick_energy: [],
                     protein_rich: [],
@@ -1438,13 +1285,11 @@ Be realistic and practical in your recommendations.
                     full_meals: []
                 };
                 
-                // Reset category tags
                 document.querySelectorAll('.category-tag').forEach(tag => {
                     tag.classList.remove('active');
                 });
                 document.querySelector('.category-tag[data-category="quick-energy"]').classList.add('active');
                 
-                // Reset errors
                 elements.weightError.classList.remove('show');
                 elements.ageError.classList.remove('show');
                 elements.genderError.classList.remove('show');
