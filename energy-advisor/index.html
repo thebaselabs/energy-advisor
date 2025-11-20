@@ -831,7 +831,8 @@
         (function(){
             'use strict';
             
-            // 🔥 NO API KEY HERE - IT'S SAFE ON VERCEL SERVER
+            // ✅ NO API KEY IN FRONTEND - SAFE!
+            
             let currentCaloriesBurned = 0;
             let currentReplenishmentCalories = 0;
             let currentActivityCategory = null;
@@ -964,7 +965,7 @@
                 try {
                     const activityDescription = elements.customActivity.value.trim();
                     
-                    // Call Vercel backend instead of direct API
+                    // Call our Vercel server for analysis
                     const aiResponse = await callGeminiAI(activityDescription, userProfile);
                     
                     // Validate AI response before using it
@@ -994,40 +995,26 @@
                 }
             }
 
+            // ✅ SIMPLIFIED FUNCTION - Calls our Vercel server
             async function callGeminiAI(activityDescription, userProfile) {
-                // ✅ Using your Vercel backend
-                const VERCEL_BACKEND_URL = '/api/analyze';
+                // Call our Vercel serverless function
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        activity: activityDescription,
+                        profile: userProfile
+                    })
+                });
 
-                try {
-                    console.log('🚀 Calling Vercel backend...');
-                    
-                    const response = await fetch(VERCEL_BACKEND_URL, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            activity: activityDescription,
-                            profile: userProfile
-                        })
-                    });
-
-                    console.log('📡 Backend response status:', response.status);
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || `Backend error: ${response.status}`);
-                    }
-
-                    const aiResponse = await response.json();
-                    console.log('✅ Secure AI Response received', aiResponse);
-                    
-                    return aiResponse;
-                    
-                } catch (error) {
-                    console.error('❌ Backend Error:', error);
-                    throw error;
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'AI request failed');
                 }
+
+                return await response.json();
             }
 
             function parseAIFoodCategories(aiResponse) {
@@ -1152,6 +1139,7 @@
                     return;
                 }
                 
+                // Calculate replenishment calories
                 const goal = elements.weightGoal.value;
                 const replenishPercent = parseInt(elements.replenishPercent.value);
                 
@@ -1272,6 +1260,12 @@
                 currentReplenishmentCalories = 0;
                 currentActivityCategory = null;
                 userProfile = {};
+                userPreferences = {
+                    dietary: 'any',
+                    timing: 'immediate',
+                    goal: 'recovery',
+                    allergies: []
+                };
                 aiFoodCategories = {
                     quick_energy: [],
                     protein_rich: [],
