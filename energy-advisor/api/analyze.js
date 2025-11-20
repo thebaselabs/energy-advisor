@@ -1,33 +1,30 @@
-export default async function handler(req, res) {
-  // Get data from your website
-  const { activity, profile } = JSON.parse(req.body);
-  
-  // YOUR API KEY IS SAFE HERE - we'll add it later
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-  
-  const prompt = `USER PROFILE:
-- Weight: ${profile.weight} kg
-- Age: ${profile.age} years  
-- Gender: ${profile.gender}
-- Fitness Level: ${profile.fitnessLevel}
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-ACTIVITY: "${activity}"
-
-[KEEP YOUR EXISTING AI PROMPT HERE - copy from your current code]`;
-
-  // Call Google AI (key is hidden)
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 2000,
-      }
-    })
-  });
+module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
-  const data = await response.json();
-  res.json(data);
-}
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const { activity, profile } = req.body;
+    if (!activity || !profile) return res.status(400).json({ error: "Missing data" });
+
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) return res.status(500).json({ error: "API key not configured" });
+
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+    const prompt = `[USE YOUR EXACT PROMPT FROM BEFORE]`;
+    
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    
+    res.json({ success: true, data: response.text() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
