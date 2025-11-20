@@ -995,7 +995,7 @@
             }
 
             async function callGeminiAI(activityDescription, userProfile) {
-                // ✅ Using your Vercel backend instead of direct API
+                // ✅ Using your Vercel backend
                 const VERCEL_BACKEND_URL = '/api/analyze';
 
                 try {
@@ -1015,21 +1015,15 @@
                     console.log('📡 Backend response status:', response.status);
                     
                     if (!response.ok) {
-                        throw new Error(`Backend request failed: ${response.status}`);
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || `Backend error: ${response.status}`);
                     }
 
-                    const data = await response.json();
-                    console.log('✅ Backend response received');
+                    const aiResponse = await response.json();
+                    console.log('✅ Secure AI Response received', aiResponse);
                     
-                    // Extract JSON from AI response text
-                    const responseText = data.candidates[0].content.parts[0].text;
-                    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+                    return aiResponse;
                     
-                    if (jsonMatch) {
-                        return JSON.parse(jsonMatch[0]);
-                    } else {
-                        throw new Error('No JSON found in AI response');
-                    }
                 } catch (error) {
                     console.error('❌ Backend Error:', error);
                     throw error;
