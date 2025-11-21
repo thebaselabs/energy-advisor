@@ -4,15 +4,12 @@
     {
       "src": "api/analyze.js",
       "use": "@vercel/node"
-    },
-    {
-      "src": "index.html",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
       "src": "/api/analyze",
+      "methods": ["GET", "POST", "OPTIONS"],
       "dest": "/api/analyze.js"
     },
     {
