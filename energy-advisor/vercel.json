@@ -8,8 +8,7 @@
   ],
   "routes": [
     {
-      "src": "/api/analyze",
-      "methods": ["GET", "POST", "OPTIONS"],
+      "src": "/api/(.*)",
       "dest": "/api/analyze.js"
     },
     {
